@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -60,6 +60,12 @@ async function run() {
                 console.error('Error fetching books:', error);
                 res.status(500).json({ error: 'Failed to fetch books' });
             }
+        });
+
+        app.delete('/books/:id', async (req, res) => {
+            const id = req.params.id;
+            const result = await bookCollection.deleteOne({ _id: new ObjectId(id) });
+            res.send(result);
         });
 
         // Send a ping to confirm a successful connection
