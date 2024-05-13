@@ -25,7 +25,7 @@ async function run() {
         await client.connect();
 
         const userCollection = client.db('Book').collection('user');
-
+        const bookCollection = client.db('Book').collection('book');
 
         //User API ->
         app.post('/user', async (req, res) => {
@@ -41,6 +41,24 @@ async function run() {
             } catch (error) {
                 console.error('Error fetching users:', error);
                 res.status(500).json({ error: 'Failed to fetch users' });
+            }
+        });
+
+        //Book API ->
+
+        app.post('/book', async (req, res) => {
+            const book = req.body;
+            const result = await bookCollection.insertOne(book);
+            res.send(result);
+        });
+
+        app.get('/books', async (req, res) => {
+            try {
+                const books = await bookCollection.find().toArray();
+                res.json(books);
+            } catch (error) {
+                console.error('Error fetching books:', error);
+                res.status(500).json({ error: 'Failed to fetch books' });
             }
         });
 
