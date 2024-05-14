@@ -131,6 +131,27 @@ async function run() {
             }
         });
 
+        // Update book by ID
+        app.put('/books/:id', async (req, res) => {
+            const { id } = req.params;
+            const updatedBook = req.body;
+
+            try {
+                const result = await bookCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: updatedBook }
+                );
+
+                if (result.matchedCount === 0) {
+                    return res.status(404).json({ error: 'Book not found' });
+                }
+
+                res.json({ message: 'Book updated successfully', book: updatedBook });
+            } catch (error) {
+                console.error('Error updating book:', error);
+                res.status(500).json({ error: 'Failed to update book' });
+            }
+        });
 
         // Ping to confirm connection
         await client.db("admin").command({ ping: 1 });
