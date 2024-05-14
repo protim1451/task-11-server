@@ -10,7 +10,6 @@ app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.edgm8kl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
     serverApi: {
         version: ServerApiVersion.v1,
@@ -21,13 +20,36 @@ const client = new MongoClient(uri, {
 
 async function run() {
     try {
-        // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
 
         const userCollection = client.db('Book').collection('user');
         const bookCollection = client.db('Book').collection('book');
+        const categoriesCollection = client.db('Book').collection('categories');
 
-        //User API ->
+        // Function to insert initial categories
+        async function insertInitialCategories() {
+            const categories = [
+                { name: 'Fiction' },
+                { name: 'Non-fiction' },
+                { name: 'Mystery' },
+                { name: 'Romance' },
+                { name: 'Science fiction' },
+                { name: 'Fantasy' },
+                { name: 'Thriller' },
+                { name: 'Historical fiction' },
+                { name: 'Biography' },
+                { name: 'Self-help' }
+            ];
+            await categoriesCollection.insertMany(categories);
+        }
+
+        // Insert initial categories (run once)
+        const categoriesCount = await categoriesCollection.countDocuments();
+        if (categoriesCount === 0) {
+            await insertInitialCategories();
+        }
+
+        // User API
         app.post('/user', async (req, res) => {
             const user = req.body;
             const result = await userCollection.insertOne(user);
@@ -44,8 +66,7 @@ async function run() {
             }
         });
 
-        //Book API ->
-
+        // Book API
         app.post('/book', async (req, res) => {
             const book = req.body;
             const result = await bookCollection.insertOne(book);
@@ -68,22 +89,62 @@ async function run() {
             res.send(result);
         });
 
-        // Send a ping to confirm a successful connection
+        // Category API
+        app.get('/categories', async (req, res) => {
+            try {
+                console.log('Fetching categories...');
+                const categories = await categoriesCollection.find().toArray();
+                console.log('Fetched categories:', categories);
+                res.json(categories.map(category => category.name));
+            } catch (error) {
+                console.error('Error fetching categories:', error);
+                res.status(500).json({ error: 'Failed to fetch categories' });
+            }
+        });
+
+        // Fetch books by category
+        app.get('/books/category/:category', async (req, res) => {
+            const { category } = req.params;
+            try {
+                console.log(`Fetching books for category: ${category}`);
+                const books = await bookCollection.find({ category }).toArray();
+                console.log('Fetched books:', books);
+                res.json(books);
+            } catch (error) {
+                console.error('Error fetching books by category:', error);
+                res.status(500).json({ error: 'Failed to fetch books by category' });
+            }
+        });
+
+        // Fetch book by ID
+        app.get('/books/:id', async (req, res) => {
+            const { id } = req.params;
+            try {
+                const book = await bookCollection.findOne({ _id: new ObjectId(id) });
+                if (!book) {
+                    return res.status(404).json({ error: 'Book not found' });
+                }
+                res.json(book);
+            } catch (error) {
+                console.error('Error fetching book details:', error);
+                res.status(500).json({ error: 'Failed to fetch book details' });
+            }
+        });
+
+
+        // Ping to confirm connection
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
-
     }
 }
 run().catch(console.dir);
 
-
-
 app.get('/', (req, res) => {
     res.send('server running');
-})
+});
 
 app.listen(port, () => {
     console.log(`server is running on port: ${port}`);
-})
+});
