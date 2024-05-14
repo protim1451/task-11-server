@@ -25,6 +25,7 @@ async function run() {
         const userCollection = client.db('Book').collection('user');
         const bookCollection = client.db('Book').collection('book');
         const categoriesCollection = client.db('Book').collection('categories');
+        const borrowCollection = client.db('Book').collection('borrow');
 
         // Function to insert initial categories
         async function insertInitialCategories() {
@@ -152,6 +153,88 @@ async function run() {
                 res.status(500).json({ error: 'Failed to update book' });
             }
         });
+
+        // Borrow book endpoint
+        app.post('/borrow/:id', async (req, res) => {
+            const { id } = req.params;
+            const { userId, userEmail, userName, returnDate, borrowDate, name, image, category } = req.body;
+        
+            try {
+                const book = await bookCollection.findOne({ _id: new ObjectId(id) });
+                if (!book) {
+                    return res.status(404).json({ error: 'Book not found' });
+                }
+        
+                // Ensure quantity is an integer
+                const quantity = parseInt(book.quantity, 10);
+        
+                if (quantity <= 0) {
+                    return res.status(400).json({ error: 'Book not available for borrowing' });
+                }
+        
+                // Reduce quantity by 1
+                const updateResult = await bookCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $inc: { quantity: -1 } }
+                );
+        
+                // Add to borrowed books
+                const borrowResult = await borrowCollection.insertOne({
+                    bookId: new ObjectId(id),
+                    userId,
+                    userEmail,
+                    userName,
+                    returnDate,
+                    borrowDate,
+                    name,
+                    image,
+                    category
+                });
+        
+                res.json({ updateResult, borrowResult });
+            } catch (error) {
+                console.error('Error borrowing book:', error);
+                res.status(500).json({ error: 'Failed to borrow book' });
+            }
+        });
+         
+
+        // Return book
+        app.post('/return', async (req, res) => {
+            const { bookId, userEmail } = req.body;
+            try {
+                const result = await borrowCollection.deleteOne({ bookId: new ObjectId(bookId), userEmail });
+
+                // const quantity = parseInt(book.quantity, 10);
+
+                if (result.deletedCount === 0) {
+                    return res.status(404).json({ error: 'Borrow record not found' });
+                }
+
+                await bookCollection.updateOne(
+                    { _id: new ObjectId(bookId) },
+                    { $inc: { quantity: 1 } }
+                );
+
+                res.json(result);
+            } catch (error) {
+                console.error('Error returning book:', error);
+                res.status(500).json({ error: 'Failed to return book' });
+            }
+        });
+
+        // Get borrowed books by user
+        app.get('/borrowed/:email', async (req, res) => {
+            const { email } = req.params;
+            try {
+                const borrowedBooks = await borrowCollection.find({ userEmail: email }).toArray();
+                res.json(borrowedBooks);
+            } catch (error) {
+                console.error('Error fetching borrowed books:', error);
+                res.status(500).json({ error: 'Failed to fetch borrowed books' });
+            }
+        });
+
 
         // Ping to confirm connection
         await client.db("admin").command({ ping: 1 });
