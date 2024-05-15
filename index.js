@@ -15,17 +15,32 @@ const client = new MongoClient(uri, {
         version: ServerApiVersion.v1,
         strict: true,
         deprecationErrors: true,
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
     }
 });
 
 async function run() {
     try {
-        await client.connect();
+        //await client.connect();
 
         const userCollection = client.db('Book').collection('user');
         const bookCollection = client.db('Book').collection('book');
         const categoriesCollection = client.db('Book').collection('categories');
         const borrowCollection = client.db('Book').collection('borrow');
+
+        const books = await bookCollection.find({}).toArray();
+        const bulkOperations = books.map(book => ({
+            updateOne: {
+                filter: { _id: book._id },
+                update: { $set: { quantity: parseInt(book.quantity, 10) || 0 } }
+            }
+        }));
+
+        if (bulkOperations.length > 0) {
+            await bookCollection.bulkWrite(bulkOperations);
+            console.log('Updated quantities to numeric values');
+        }
 
         // Function to insert initial categories
         async function insertInitialCategories() {
@@ -70,9 +85,11 @@ async function run() {
         // Book API
         app.post('/book', async (req, res) => {
             const book = req.body;
+            book.quantity = parseInt(book.quantity, 10) || 0; // Ensure quantity is a number
             const result = await bookCollection.insertOne(book);
             res.send(result);
         });
+
 
         app.get('/books', async (req, res) => {
             try {
@@ -158,27 +175,23 @@ async function run() {
         app.post('/borrow/:id', async (req, res) => {
             const { id } = req.params;
             const { userId, userEmail, userName, returnDate, borrowDate, name, image, category } = req.body;
-        
+
             try {
                 const book = await bookCollection.findOne({ _id: new ObjectId(id) });
                 if (!book) {
                     return res.status(404).json({ error: 'Book not found' });
                 }
-        
-                // Ensure quantity is an integer
+
                 const quantity = parseInt(book.quantity, 10);
-        
                 if (quantity <= 0) {
                     return res.status(400).json({ error: 'Book not available for borrowing' });
                 }
-        
-                // Reduce quantity by 1
+
                 const updateResult = await bookCollection.updateOne(
                     { _id: new ObjectId(id) },
                     { $inc: { quantity: -1 } }
                 );
-        
-                // Add to borrowed books
+
                 const borrowResult = await borrowCollection.insertOne({
                     bookId: new ObjectId(id),
                     userId,
@@ -190,23 +203,20 @@ async function run() {
                     image,
                     category
                 });
-        
+
                 res.json({ updateResult, borrowResult });
             } catch (error) {
                 console.error('Error borrowing book:', error);
                 res.status(500).json({ error: 'Failed to borrow book' });
             }
         });
-         
+
 
         // Return book
         app.post('/return', async (req, res) => {
             const { bookId, userEmail } = req.body;
             try {
                 const result = await borrowCollection.deleteOne({ bookId: new ObjectId(bookId), userEmail });
-
-                // const quantity = parseInt(book.quantity, 10);
-
                 if (result.deletedCount === 0) {
                     return res.status(404).json({ error: 'Borrow record not found' });
                 }
@@ -237,7 +247,7 @@ async function run() {
 
 
         // Ping to confirm connection
-        await client.db("admin").command({ ping: 1 });
+       // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
