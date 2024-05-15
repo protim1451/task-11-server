@@ -5,7 +5,16 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+app.use(
+    cors({
+      origin: [
+        "http://localhost:5173",
+        "https://b9a11-client-side-protim1451.firebaseapp.com",
+        "https://b9a11-client-side-protim1451.web.app",
+      ],
+      credentials: true,
+    })
+  );
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.edgm8kl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
