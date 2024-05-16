@@ -3,18 +3,26 @@ const cors = require('cors');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
-const port = process.env.PORT || 3000;
+app.use(cors({
+    origin: ["https://b9a11-client-side-protim1451.web.app","https://b9a11-client-side-protim1451.firebaseapp.com", "http://localhost:5173"]
+  }));
+// app.use(cors({
+//     origin: ["https://b9a11-client-side-protim1451.web.app", "https://b9a11-client-side-protim1451.firebaseapp.com", "http://localhost:5173"],
+//     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+//     allowedHeaders: ["Content-Type", "Authorization"],
+//     credentials: true
+// }));
 
-app.use(
-    cors({
-      origin: [
-        "http://localhost:5173",
-        "https://b9a11-client-side-protim1451.firebaseapp.com",
-        "https://b9a11-client-side-protim1451.web.app",
-      ],
-      credentials: true,
-    })
-  );
+// Add this middleware before defining your routes
+app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', 'https://b9a11-client-side-protim1451.web.app');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    next();
+});
+
+
+const port = process.env.PORT || 3000;
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.edgm8kl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -32,47 +40,48 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         //await client.connect();
+        console.log("Connected to MongoDB");
 
         const userCollection = client.db('Book').collection('user');
         const bookCollection = client.db('Book').collection('book');
         const categoriesCollection = client.db('Book').collection('categories');
         const borrowCollection = client.db('Book').collection('borrow');
 
-        const books = await bookCollection.find({}).toArray();
-        const bulkOperations = books.map(book => ({
-            updateOne: {
-                filter: { _id: book._id },
-                update: { $set: { quantity: parseInt(book.quantity, 10) || 0 } }
-            }
-        }));
+        // const books = await bookCollection.find({}).toArray();
+        // const bulkOperations = books.map(book => ({
+        //     updateOne: {
+        //         filter: { _id: book._id },
+        //         update: { $set: { quantity: parseInt(book.quantity, 10) || 0 } }
+        //     }
+        // }));
 
-        if (bulkOperations.length > 0) {
-            await bookCollection.bulkWrite(bulkOperations);
-            console.log('Updated quantities to numeric values');
-        }
+        // if (bulkOperations.length > 0) {
+        //     await bookCollection.bulkWrite(bulkOperations);
+        //     console.log('Updated quantities to numeric values');
+        // }
 
         // Function to insert initial categories
-        async function insertInitialCategories() {
-            const categories = [
-                { name: 'Fiction' },
-                { name: 'Non-fiction' },
-                { name: 'Mystery' },
-                { name: 'Romance' },
-                { name: 'Science fiction' },
-                { name: 'Fantasy' },
-                { name: 'Thriller' },
-                { name: 'Historical fiction' },
-                { name: 'Biography' },
-                { name: 'Self-help' }
-            ];
-            await categoriesCollection.insertMany(categories);
-        }
+        // async function insertInitialCategories() {
+        //     const categories = [
+        //         { name: 'Fiction' },
+        //         { name: 'Non-fiction' },
+        //         { name: 'Mystery' },
+        //         { name: 'Romance' },
+        //         { name: 'Science fiction' },
+        //         { name: 'Fantasy' },
+        //         { name: 'Thriller' },
+        //         { name: 'Historical fiction' },
+        //         { name: 'Biography' },
+        //         { name: 'Self-help' }
+        //     ];
+        //     await categoriesCollection.insertMany(categories);
+        // }
 
-        // Insert initial categories (run once)
-        const categoriesCount = await categoriesCollection.countDocuments();
-        if (categoriesCount === 0) {
-            await insertInitialCategories();
-        }
+        // // Insert initial categories (run once)
+        // const categoriesCount = await categoriesCollection.countDocuments();
+        // if (categoriesCount === 0) {
+        //     await insertInitialCategories();
+        // }
 
         // User API
         app.post('/user', async (req, res) => {
@@ -94,7 +103,7 @@ async function run() {
         // Book API
         app.post('/book', async (req, res) => {
             const book = req.body;
-            book.quantity = parseInt(book.quantity, 10) || 0; // Ensure quantity is a number
+            book.quantity = parseInt(book.quantity, 10) || 0; 
             const result = await bookCollection.insertOne(book);
             res.send(result);
         });
@@ -258,10 +267,11 @@ async function run() {
         // Ping to confirm connection
        // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
-    } finally {
-        // Ensures that the client will close when you finish/error
-    }
+    } catch (error) {
+        console.error('Error connecting to MongoDB:', error);
+      }
 }
+
 run().catch(console.dir);
 
 app.get('/', (req, res) => {
